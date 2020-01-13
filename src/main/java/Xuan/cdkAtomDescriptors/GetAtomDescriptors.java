@@ -64,8 +64,47 @@ public class GetAtomDescriptors {
 		
 		List<IDescriptor> descriptorList = engine.getDescriptorInstances();
 		ArrayList<String> descriptorNames = descriptorUtil.getDescriptorNames(descriptorList);
-//		System.out.println(descriptorNames.toString());
-//		System.out.println(descriptorNames.size());
+		IAtomContainer molecule = descriptorUtil.convertSdfToIAtomContainer(inputFilePath);
+		HashMap<Integer,ArrayList<Double>> descriptorValue = descriptorUtil.getAtomicDescriptor(molecule, 
+														descriptorList, descriptorNames, atom_type, nearest_atoms);
+		JSONObject JsonObj = new JSONObject();
+		JsonObj.put("AtomType", atom_type);
+		JsonObj.put("NearestAtoms", nearest_atoms);
+		
+		JSONObject DescriptorValue = new JSONObject();
+		for(Integer atom_position : descriptorValue.keySet()) {
+//			System.out.println(descriptorValue.toString());
+			JSONArray JsonArray = new JSONArray();
+			JsonArray.addAll(descriptorValue.get(atom_position));
+			DescriptorValue.put(atom_position, JsonArray);
+		}
+		JsonObj.put("Descriptors", DescriptorValue);
+
+		JSONArray descriptorNamesInJason = new JSONArray();
+		for(int i = 0; i < nearest_atoms; i++) {
+			descriptorNamesInJason.addAll(descriptorNames);
+		}
+		JsonObj.put("DescriptorsName", descriptorNamesInJason);
+		
+		writeJsonFile(outputFilePath, JsonObj); 
+	}
+	
+	/**
+	 * Example main
+	 * input: molecule file (has be 3D), output file, atom type, nearest atoms
+	 * return: json output or json file 
+	 * @throws IOException 
+	 */
+	@SuppressWarnings("unchecked")
+	public void runCDKAtomDescriptors(String inputFilePath, String outputFilePath, String atom_type,
+							String nearest) throws IOException {
+
+		int nearest_atoms = Integer.valueOf(nearest);
+		
+		GetAtomDescriptors descriptorUtil = new GetAtomDescriptors();
+		
+		List<IDescriptor> descriptorList = engine.getDescriptorInstances();
+		ArrayList<String> descriptorNames = descriptorUtil.getDescriptorNames(descriptorList);
 		IAtomContainer molecule = descriptorUtil.convertSdfToIAtomContainer(inputFilePath);
 		HashMap<Integer,ArrayList<Double>> descriptorValue = descriptorUtil.getAtomicDescriptor(molecule, 
 														descriptorList, descriptorNames, atom_type, nearest_atoms);
