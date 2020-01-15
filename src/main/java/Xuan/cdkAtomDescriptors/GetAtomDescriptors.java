@@ -51,40 +51,14 @@ public class GetAtomDescriptors {
 	 * return: json output or json file 
 	 * @throws IOException 
 	 */
-	@SuppressWarnings("unchecked")
 	public void execute(CommandLine cmd) throws IOException {
 		
 		String inputFilePath = cmd.getOptionValue("input");
 		String outputFilePath = cmd.getOptionValue("output");
 		String atom_type = cmd.getOptionValue("atomtype");
 		String nearest = cmd.getOptionValue("nearest");
-		int nearest_atoms = Integer.valueOf(nearest);
 		
-		GetAtomDescriptors descriptorUtil = new GetAtomDescriptors();
-		
-		List<IDescriptor> descriptorList = engine.getDescriptorInstances();
-		ArrayList<String> descriptorNames = descriptorUtil.getDescriptorNames(descriptorList);
-		IAtomContainer molecule = descriptorUtil.convertSdfToIAtomContainer(inputFilePath);
-		HashMap<Integer,ArrayList<Double>> descriptorValue = descriptorUtil.getAtomicDescriptor(molecule, 
-														descriptorList, descriptorNames, atom_type, nearest_atoms);
-		JSONObject JsonObj = new JSONObject();
-		JsonObj.put("AtomType", atom_type);
-		JsonObj.put("NearestAtoms", nearest_atoms);
-		
-		JSONObject DescriptorValue = new JSONObject();
-		for(Integer atom_position : descriptorValue.keySet()) {
-//			System.out.println(descriptorValue.toString());
-			JSONArray JsonArray = new JSONArray();
-			JsonArray.addAll(descriptorValue.get(atom_position));
-			DescriptorValue.put(atom_position, JsonArray);
-		}
-		JsonObj.put("Descriptors", DescriptorValue);
-
-		JSONArray descriptorNamesInJason = new JSONArray();
-		for(int i = 0; i < nearest_atoms; i++) {
-			descriptorNamesInJason.addAll(descriptorNames);
-		}
-		JsonObj.put("DescriptorsName", descriptorNamesInJason);
+		JSONObject JsonObj = runCDKAtomDescriptors(inputFilePath, outputFilePath,atom_type,nearest);
 		
 		writeJsonFile(outputFilePath, JsonObj); 
 	}
@@ -96,7 +70,7 @@ public class GetAtomDescriptors {
 	 * @throws IOException 
 	 */
 	@SuppressWarnings("unchecked")
-	public void runCDKAtomDescriptors(String inputFilePath, String outputFilePath, String atom_type,
+	public JSONObject runCDKAtomDescriptors(String inputFilePath, String outputFilePath, String atom_type,
 							String nearest) throws IOException {
 
 		int nearest_atoms = Integer.valueOf(nearest);
@@ -106,20 +80,43 @@ public class GetAtomDescriptors {
 		List<IDescriptor> descriptorList = engine.getDescriptorInstances();
 		ArrayList<String> descriptorNames = descriptorUtil.getDescriptorNames(descriptorList);
 		IAtomContainer molecule = descriptorUtil.convertSdfToIAtomContainer(inputFilePath);
+		
+		ArrayList<ArrayList<Double>> atomDescriptor = calculateAtomDescriptors( molecule, descriptorList); // each atom has at least 27 descriptor values
+		ArrayList<ArrayList<Integer>> nearestAtoms =  getNearestAtoms(molecule);
+		
+		
 		HashMap<Integer,ArrayList<Double>> descriptorValue = descriptorUtil.getAtomicDescriptor(molecule, 
-														descriptorList, descriptorNames, atom_type, nearest_atoms);
+																descriptorList, descriptorNames, atomDescriptor,
+																nearestAtoms, atom_type, nearest_atoms);
 		JSONObject JsonObj = new JSONObject();
 		JsonObj.put("AtomType", atom_type);
 		JsonObj.put("NearestAtoms", nearest_atoms);
 		
 		JSONObject DescriptorValue = new JSONObject();
 		for(Integer atom_position : descriptorValue.keySet()) {
-//			System.out.println(descriptorValue.toString());
-			JSONArray JsonArray = new JSONArray();
+ 			JSONArray JsonArray = new JSONArray();
 			JsonArray.addAll(descriptorValue.get(atom_position));
 			DescriptorValue.put(atom_position, JsonArray);
 		}
 		JsonObj.put("Descriptors", DescriptorValue);
+		
+		JSONObject atomDescriptorValue = new JSONObject();
+		JSONObject atomNearestAtoms    = new JSONObject();
+		JSONObject atomType 			   = new JSONObject();
+		for(int atom = 0; atom < atomDescriptor.size(); atom++) {
+			JSONArray JsonArray = new JSONArray();
+			JSONArray JsonArrayNA = new JSONArray();
+			JsonArray.addAll(atomDescriptor.get(atom));
+			JsonArrayNA.addAll(nearestAtoms.get(atom));
+			atomType.put(atom, molecule.getAtom(atom).getSymbol());
+			atomDescriptorValue.put(atom, JsonArray);
+			atomNearestAtoms.put(atom, JsonArrayNA);
+		}
+		JsonObj.put("AtomDescriptorValue", atomDescriptorValue);
+		JsonObj.put("AtomNearestAtoms", atomNearestAtoms);
+		JsonObj.put("AtomSymbol", atomType);
+		
+		
 
 		JSONArray descriptorNamesInJason = new JSONArray();
 		for(int i = 0; i < nearest_atoms; i++) {
@@ -127,7 +124,7 @@ public class GetAtomDescriptors {
 		}
 		JsonObj.put("DescriptorsName", descriptorNamesInJason);
 		
-		writeJsonFile(outputFilePath, JsonObj); 
+		return JsonObj;
 	}
 	
 	
@@ -202,10 +199,11 @@ public class GetAtomDescriptors {
 	 *  4. return atom_position: Double[] (descriptors)
 	 */
 	public HashMap<Integer,ArrayList<Double>> getAtomicDescriptor(IAtomContainer molecule, List<IDescriptor> descriptorList, 
-			ArrayList<String> descriptorNames, String atomType, int num_atoms) throws java.io.IOException {
+			ArrayList<String> descriptorNames, ArrayList<ArrayList<Double>> atomDescriptor,
+			ArrayList<ArrayList<Integer>> nearestAtoms,
+			String atomType, int num_atoms) throws java.io.IOException {
 		
-		ArrayList<ArrayList<Double>> atomDescriptor = calculateAtomDescriptors( molecule, descriptorList); // each atom has at least 27 descriptor values
-		ArrayList<ArrayList<Integer>> nearestAtoms =  getNearestAtoms(molecule);
+		
 		ArrayList<Integer> atoms_position = new ArrayList<Integer>();
 		HashMap<Integer,ArrayList<Double>> result = new HashMap<Integer,ArrayList<Double>>();
 		
