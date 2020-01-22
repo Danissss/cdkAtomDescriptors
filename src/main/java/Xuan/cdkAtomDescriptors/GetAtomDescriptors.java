@@ -169,7 +169,10 @@ public class GetAtomDescriptors {
 		ArrayList<String> descriptorNames = new ArrayList<String>();
 		for(int i = 0; i < descriptorList.size(); i++) {
 			String[] tmp = descriptorList.get(i).getDescriptorNames();
-			descriptorNames.add(tmp[0]);
+			for(int d = 0; d < tmp.length; d++) {
+				descriptorNames.add(tmp[d]);
+			}
+			
 		}
 		return descriptorNames;
 	}
@@ -396,6 +399,7 @@ public class GetAtomDescriptors {
 	 */
 	public static ArrayList<Double> computeDescriptorsAtomic(IAtomContainer mol, IAtom atom, List<IDescriptor> descriptor) {
 		ArrayList<Double> vv = new ArrayList<Double>();
+		// System.out.println("calculating==============:=> "+atom.getSymbol() + " " + mol.getAtomNumber(atom));
 		for(int i = 0; i < descriptor.size(); i++) {
 			try {
 				
@@ -406,9 +410,14 @@ public class GetAtomDescriptors {
 				} else if (res instanceof DoubleResult) {
 					vv.add(((DoubleResult) res).doubleValue());
 				} else if (res instanceof DoubleArrayResult) {
-					vv.add(((DoubleArrayResult) res).get(0));
+					for(int d = 0; d < ((DoubleArrayResult) res).length(); d++) {
+						vv.add(((DoubleArrayResult) res).get(d));
+					}
+					
 				} else if (res instanceof IntegerArrayResult) {
-					vv.add((double) ((IntegerArrayResult) res).get(0));
+					for(int d = 0; d < ((IntegerArrayResult) res).length(); d++) {
+						vv.add(Double.valueOf(((IntegerArrayResult) res).get(d)));
+					}
 				} else if (res instanceof BooleanResult) {
 					// true = 1.0; false = 0.0;
 					if(((BooleanResult) res).booleanValue() == true) {
