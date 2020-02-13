@@ -79,6 +79,7 @@ public class GetAtomDescriptors {
 		
 		List<IDescriptor> descriptorList = engine.getDescriptorInstances();
 		ArrayList<String> descriptorNames = descriptorUtil.getDescriptorNames(descriptorList);
+//		System.out.println(descriptorNames.size());
 		IAtomContainer molecule = descriptorUtil.convertSdfToIAtomContainer(inputFilePath);
 		
 		ArrayList<ArrayList<Double>> atomDescriptor = calculateAtomDescriptors( molecule, descriptorList); // each atom has at least 27 descriptor values
@@ -88,6 +89,10 @@ public class GetAtomDescriptors {
 		HashMap<Integer,ArrayList<Double>> descriptorValue = descriptorUtil.getAtomicDescriptor(molecule, 
 																descriptorList, descriptorNames, atomDescriptor,
 																nearestAtoms, atom_type, nearest_atoms);
+//		for (Integer key : descriptorValue.keySet()) {
+//			System.out.println(descriptorValue.get(key).toString());
+//			System.out.println(descriptorValue.get(key).size());
+//		}
 		JSONObject JsonObj = new JSONObject();
 		JsonObj.put("AtomType", atom_type);
 		JsonObj.put("NearestAtoms", nearest_atoms);
@@ -241,7 +246,10 @@ public class GetAtomDescriptors {
 		ArrayList<ArrayList<Double>> atomDescriptor = new ArrayList<ArrayList<Double>>();
 		
 		for(int i = 0; i < molecule.getAtomCount(); i++) {
+//			System.out.println("calculating==============:=> "+molecule.getAtom(i).getSymbol());
 			ArrayList<Double> tmp = computeDescriptorsAtomic(molecule,molecule.getAtom(i), descriptorList);
+//			System.out.println(tmp.size());
+//			System.out.println(tmp.toString());
 			atomDescriptor.add(tmp);
 		}
 		
@@ -381,12 +389,12 @@ public class GetAtomDescriptors {
 	}
 
 	
-	// this is for atomic descriptor (esp. for NMR prediction)
-	// I dont really see the point of this function :) 
-	public static List<Double[]> computeListsAtomic(IAtomContainer mol, List<IAtom> atoms, IAtomicDescriptor desc) {
-		List<Double[]> values = computeDescriptorsAtomic(mol, atoms, desc);
-		return values;
-	}
+//	// this is for atomic descriptor (esp. for NMR prediction)
+//	// I dont really see the point of this function :) 
+//	public static List<Double[]> computeListsAtomic(IAtomContainer mol, List<IAtom> atoms, IAtomicDescriptor desc) {
+//		List<Double[]> values = computeDescriptorsAtomic(mol, atoms, desc);
+//		return values;
+//	}
 
 
 	
@@ -399,20 +407,27 @@ public class GetAtomDescriptors {
 	 */
 	public static ArrayList<Double> computeDescriptorsAtomic(IAtomContainer mol, IAtom atom, List<IDescriptor> descriptor) {
 		ArrayList<Double> vv = new ArrayList<Double>();
-		// System.out.println("calculating==============:=> "+atom.getSymbol() + " " + mol.getAtomNumber(atom));
 		for(int i = 0; i < descriptor.size(); i++) {
 			try {
 				
 				IDescriptorResult res = ((IAtomicDescriptor) descriptor.get(i)).calculate(atom, mol).getValue();
-				//System.out.println(res.toString());// res contain all the value for each atom
+				
 				if (res instanceof IntegerResult) {
 					vv.add((double) ((IntegerResult) res).intValue());
+					
 				} else if (res instanceof DoubleResult) {
 					vv.add(((DoubleResult) res).doubleValue());
 				} else if (res instanceof DoubleArrayResult) {
-					for(int d = 0; d < ((DoubleArrayResult) res).length(); d++) {
+//					for(int d = 0; d < ((DoubleArrayResult) res).length(); d++) {
+//						vv.add(((DoubleArrayResult) res).get(d));
+//					}
+					
+					// did this because of https://github.com/cdk/cdk/issues/620
+					String[] descriptorName = ((IAtomicDescriptor) descriptor.get(i)).getDescriptorNames();
+					for(int d = 0; d < descriptorName.length; d++) {
 						vv.add(((DoubleArrayResult) res).get(d));
 					}
+
 					
 				} else if (res instanceof IntegerArrayResult) {
 					for(int d = 0; d < ((IntegerArrayResult) res).length(); d++) {
@@ -427,12 +442,14 @@ public class GetAtomDescriptors {
 					}
 				}
 				
-				else
+				else {
+					System.out.println("Error");
 					throw new IllegalStateException(
 							"Unknown idescriptor result value for '" + descriptor + "' : " + res.getClass());
+				}
 			} catch (Throwable e) {
+				System.out.println("Could not compute cdk feature " + descriptor);
 				System.err.println("Could not compute cdk feature " + descriptor);
-				e.printStackTrace();
 				vv.add(0.0);
 			}
 		}
@@ -450,41 +467,41 @@ public class GetAtomDescriptors {
 	 * input: atomContainer mol; list of atoms; descriptors
 	 * calculate each descriptor for each atoms 
 	 */
-	public static List<Double[]> computeDescriptorsAtomic(IAtomContainer mol, List<IAtom> atoms, IAtomicDescriptor descriptor) {
-		List<Double[]> vv = new ArrayList<Double[]>();
-		vv.add(new Double[atoms.size()]);
-		
-		// iterate each atom
-		for (int i = 0; i < atoms.size(); i++) {
-			if (atoms.get(i) == null) {
-				vv.get(0)[i] = null;
-			} else {
-				try {
-					IDescriptorResult res = descriptor.calculate(atoms.get(i), mol).getValue();
-					//System.out.println(res.toString());// res contain all the value for each atom
-					if (res instanceof IntegerResult) {
-						vv.get(0)[i] = (double) ((IntegerResult) res).intValue();
-					} else if (res instanceof DoubleResult) {
-						vv.get(0)[i] = ((DoubleResult) res).doubleValue();
-					} else if (res instanceof DoubleArrayResult) {
-						vv.get(0)[i] = ((DoubleArrayResult) res).get(0);
-					} else if (res instanceof IntegerArrayResult) {
-						vv.get(0)[i] = (double) ((IntegerArrayResult) res).get(0);
-					} else
-						throw new IllegalStateException(
-								"Unknown idescriptor result value for '" + descriptor + "' : " + res.getClass());
-				} catch (Throwable e) {
-					System.err.println("Could not compute cdk feature " + descriptor);
-					e.printStackTrace();
-					vv.get(0)[i] = 0.0;
-				}
-			}
-			
-			if (vv.get(0)[i] != null && (vv.get(0)[i].isNaN() || vv.get(0)[i].isInfinite()))
-				vv.get(0)[i] = 0.0;
-		}
-		
-		
-		return vv;
-	}
+//	public static List<Double[]> computeDescriptorsAtomic(IAtomContainer mol, List<IAtom> atoms, IAtomicDescriptor descriptor) {
+//		List<Double[]> vv = new ArrayList<Double[]>();
+//		vv.add(new Double[atoms.size()]);
+//		
+//		// iterate each atom
+//		for (int i = 0; i < atoms.size(); i++) {
+//			if (atoms.get(i) == null) {
+//				vv.get(0)[i] = null;
+//			} else {
+//				try {
+//					IDescriptorResult res = descriptor.calculate(atoms.get(i), mol).getValue();
+//					//System.out.println(res.toString());// res contain all the value for each atom
+//					if (res instanceof IntegerResult) {
+//						vv.get(0)[i] = (double) ((IntegerResult) res).intValue();
+//					} else if (res instanceof DoubleResult) {
+//						vv.get(0)[i] = ((DoubleResult) res).doubleValue();
+//					} else if (res instanceof DoubleArrayResult) {
+//						vv.get(0)[i] = ((DoubleArrayResult) res).get(0);
+//					} else if (res instanceof IntegerArrayResult) {
+//						vv.get(0)[i] = (double) ((IntegerArrayResult) res).get(0);
+//					} else
+//						throw new IllegalStateException(
+//								"Unknown idescriptor result value for '" + descriptor + "' : " + res.getClass());
+//				} catch (Throwable e) {
+//					System.err.println("Could not compute cdk feature " + descriptor);
+//					e.printStackTrace();
+//					vv.get(0)[i] = 0.0;
+//				}
+//			}
+//			
+//			if (vv.get(0)[i] != null && (vv.get(0)[i].isNaN() || vv.get(0)[i].isInfinite()))
+//				vv.get(0)[i] = 0.0;
+//		}
+//		
+//		
+//		return vv;
+//	}
 }
